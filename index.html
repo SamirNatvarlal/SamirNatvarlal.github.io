@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Relatório de KPIs - Dispositivo IoT</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        h1, h2 { text-align: center; }
+        .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 20px; 
+        }
+        @media (min-width: 768px) { 
+            .grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } 
+        }
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            height: 400px; 
+            overflow-x: auto;
+        }
+        canvas { max-width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Relatório de KPIs - Dispositivo IoT</h1>
 
+    <div class="grid">
+        <div class="card">
+            <h2>Sensores</h2>
+            <p><strong>Tensão:</strong> <span id="voltage">0V</span></p>
+            <p><strong>Corrente:</strong> <span id="current">0mA</span></p>
+            <p><strong>Potência:</strong> <span id="power">0mW</span></p>
+            <p><strong>Temperatura:</strong> <span id="temperature">0°C</span></p>
+            <p><strong>Umidade:</strong> <span id="humidity">0%</span></p>
+        </div>
+
+        <div class="card">
+            <h2>KPIs Gerais</h2>
+            <p><strong>ID Máquina:</strong> <span id="id_maquina">-</span></p>
+            <p><strong>Estado:</strong> <span id="estado">-</span></p>
+            <p><strong>Última leitura:</strong> <span id="timestamp">-</span></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Gráfico de Temperatura e Umidade</h2>
+        <div class="chart-container">
+            <canvas id="combinedChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const csvUrl = 'Results.csv';
+
+        fetch(csvUrl)
+            .then(response => response.text())
+            .then(csvText => {
+                const rows = csvText.trim().split('\n').map(row => row.split(','));
+                const headers = rows[0].map(h => h.trim().toLowerCase());
+                const data = rows.slice(1).map(row => {
+                    let obj = {};
+                    row.forEach((val, i) => obj[headers[i]] = val.trim());
+                    return obj;
+                });
+
+                if (data.length > 0) {
+                    const latest = data[data.length - 1];
+
+                    document.getElementById('voltage').textContent = latest.voltage + 'V';
+                    document.getElementById('current').textContent = latest.current + 'mA';
+                    document.getElementById('power').textContent = latest.power + 'mW';
+                    document.getElementById('temperature').textContent = latest.temperature + '°C';
+                    document.getElementById('humidity').textContent = latest.humidity + '%';
+                    document.getElementById('id_maquina').textContent = latest.id_maquina;
+                    document.getElementById('estado').textContent = latest.estado;
+                    document.getElementById('timestamp').textContent = latest.data;
+
+                    const slicedData = window.innerWidth <= 768 ? data.slice(-10) : data.slice(-50);
+                    const labels = window.innerWidth > 768 ? slicedData.map(d => d.data) : Array(slicedData.length).fill('');
+                    const tempData = slicedData.map(d => parseFloat(d.temperature));
+                    const humidityData = slicedData.map(d => parseFloat(d.humidity));
+
+                    const ctx = document.getElementById('combinedChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                { label: 'Temperatura (°C)', data: tempData, borderColor: 'rgba(255, 99, 132, 1)', backgroundColor: 'rgba(255, 99, 132, 0.2)', tension: 0.3 },
+                                { label: 'Umidade (%)', data: humidityData, borderColor: 'rgba(54, 162, 235, 1)', backgroundColor: 'rgba(54, 162, 235, 0.2)', tension: 0.3 },
+                                { label: 'OK limite', data: Array(labels.length).fill(60), borderColor: 'rgba(0, 0, 0, 0.5)', borderWidth: 1, pointRadius: 0, borderDash: [5, 5] }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            })
+            .catch(error => console.error('Erro ao carregar o CSV:', error));
+    </script>
+</body>
+</html>
